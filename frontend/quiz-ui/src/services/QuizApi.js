@@ -1,4 +1,5 @@
-const BASE_URL = "http://localhost:8080/api/quizzes";
+const BASE_URL =
+  (process.env.REACT_APP_API_BASE_URL || "http://localhost:8080") + "/api/quizzes";
 
 export const getQuizzes = async () => {
   const res = await fetch(BASE_URL);
@@ -11,11 +12,14 @@ export const getQuestions = async (quizId) => {
 };
 
 export const submitTimedQuiz = async (quizId, answers, difficulty) => {
-  const res = await fetch(`${BASE_URL}/${quizId}/submit?difficulty=${difficulty}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(answers),
-  });
+  const res = await fetch(
+    `${BASE_URL}/${quizId}/submit?difficulty=${difficulty}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(answers),
+    }
+  );
   return res.json();
 };
 
