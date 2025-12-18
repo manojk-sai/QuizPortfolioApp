@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = {"http://localhost:3000", "https://*.vercel.app"}, allowedHeaders = "*", allowedCredentials = "true")
+@CrossOrigin(origins = {"http://localhost:3000", "https://*.vercel.app"}, allowedHeaders = "*")
 public class AuthController {
 
     private final UserRepo userRepo;
