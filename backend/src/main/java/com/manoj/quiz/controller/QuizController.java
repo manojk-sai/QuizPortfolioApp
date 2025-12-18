@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/quizzes")
-@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(origins = {"http://localhost:3000", "https://quiz-portfolio-app.vercel.app"})
 public class QuizController {
 
     private final QuizRepository quizRepository;
