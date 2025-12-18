@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -54,12 +56,17 @@ public class QuizController {
     @GetMapping("/{quizId}/questions")
     public List<QuestionResponse> getQuestions(@PathVariable Long quizId) {
         List<Question> questions = questionRepo.findByQuizId(quizId);
+
+        Collections.shuffle(questions);
+
         Instant servedAt = Instant.now();
 
-        return questions.stream()
-                .map(q -> new QuestionResponse(
-                        q.getId(), q.getText(), q.getOptions(), servedAt))
-                .collect(Collectors.toList());
+        return questions.stream().map(q -> {
+            List<String> opts = new java.util.ArrayList<>(q.getOptions());
+            java.util.Collections.shuffle(opts);
+
+            return new QuestionResponse(q.getId(), q.getText(), opts, servedAt);
+        }).toList();
     }
 
     @PostMapping("/{quizId}/submit")
