@@ -3,7 +3,7 @@ package com.manoj.quiz.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
-
+import com.manoj.quiz.model.QuestionOption;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,8 +17,8 @@ public class Question {
 
     private String text; // question text
 
-    @ElementCollection
-    private List<String> options = new ArrayList<>();
+    @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<QuestionOption> options = new ArrayList<>();
 
     private String correctAnswer;
 
@@ -26,5 +26,9 @@ public class Question {
     @JoinColumn(name = "quiz_id")
     @JsonIgnore
     private Quiz quiz;
+
+    private String audioUrl;
+
+    private String optionType;
 }
 

@@ -9,13 +9,9 @@ import com.manoj.quiz.repository.QuestionRepo;
 import com.manoj.quiz.repository.QuizRepository;
 import com.manoj.quiz.service.ScoringService;
 import org.springframework.web.bind.annotation.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/quizzes")
@@ -26,7 +22,6 @@ public class QuizController {
     private final QuestionRepo questionRepo;
     private final QuizService quizService;
     private final ScoringService scoringService;
-    private static final Logger logger = LoggerFactory.getLogger(QuizController.class);
 
     public QuizController(QuizRepository quizRepository, QuestionRepo questionRepo, QuizService quizService, ScoringService scoringService) {
         this.quizRepository = quizRepository;
@@ -58,16 +53,34 @@ public class QuizController {
         List<Question> questions = questionRepo.findByQuizId(quizId);
 
         Collections.shuffle(questions);
-
         Instant servedAt = Instant.now();
 
         return questions.stream().map(q -> {
-            List<String> opts = new java.util.ArrayList<>(q.getOptions());
-            java.util.Collections.shuffle(opts);
 
-            return new QuestionResponse(q.getId(), q.getText(), opts, servedAt);
+            // Convert List<QuestionOption> -> List<String>
+            List<String> opts = q.getOptions().stream()
+                    .map(opt -> {
+                        // If IMAGE question, return imageUrl; else return label
+                        if ("IMAGE".equalsIgnoreCase(q.getOptionType())) {
+                            return opt.getImageUrl();
+                        }
+                        return opt.getLabel();
+                    })
+                    .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
+
+            Collections.shuffle(opts);
+
+            return new QuestionResponse(
+                    q.getId(),
+                    q.getText(),
+                    opts,
+                    servedAt,
+                    q.getOptionType(),  // add this if your DTO includes it
+                    q.getAudioUrl()     // add this if your DTO includes it
+            );
         }).toList();
     }
+
 
     @PostMapping("/{quizId}/submit")
     public QuizResult submitTimedQuiz(

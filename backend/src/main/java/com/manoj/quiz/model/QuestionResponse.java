@@ -7,5 +7,7 @@ public record QuestionResponse(
         Long id,
         String text,
         List<String> options,
-        Instant servedAt
+        Instant servedAt,
+        String audioUrl,
+        String optionType
 ) {}
