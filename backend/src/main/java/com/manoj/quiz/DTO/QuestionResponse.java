@@ -1,4 +1,4 @@
-package com.manoj.quiz.DTO;
+package com.manoj.quiz.dto;
 
 import java.time.Instant;
 import java.util.List;

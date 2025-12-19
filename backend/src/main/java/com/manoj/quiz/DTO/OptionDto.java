@@ -1,3 +1,3 @@
-package com.manoj.quiz.DTO;
+package com.manoj.quiz.dto;
 
 public record OptionDto(String label, String imageUrl){}

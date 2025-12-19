@@ -1,6 +1,6 @@
 package com.manoj.quiz.service;
 
-import com.manoj.quiz.DTO.QuizResult;
+import com.manoj.quiz.dto.QuizResult;
 import com.manoj.quiz.model.*;
 import com.manoj.quiz.repository.QuestionRepo;
 import com.manoj.quiz.repository.QuizAttemptRepo;

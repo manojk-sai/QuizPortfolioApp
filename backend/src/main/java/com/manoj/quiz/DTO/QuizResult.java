@@ -1,4 +1,4 @@
-package com.manoj.quiz.DTO;
+package com.manoj.quiz.dto;
 
 public class QuizResult {
 

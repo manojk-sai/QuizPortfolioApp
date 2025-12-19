@@ -1,15 +1,23 @@
 package com.manoj.quiz.controller;
 
-import com.manoj.quiz.DTO.AnswerCheckRequest;
-import com.manoj.quiz.DTO.AnswerCheckResponse;
-import com.manoj.quiz.DTO.QuizResult;
-import com.manoj.quiz.service.QuizService;
-import com.manoj.quiz.model.*;
+import com.manoj.quiz.dto.AnswerCheckRequest;
+import com.manoj.quiz.dto.AnswerCheckResponse;
+import com.manoj.quiz.dto.OptionDto;
+import com.manoj.quiz.dto.QuestionResponse;
+import com.manoj.quiz.dto.QuizResult;
+import com.manoj.quiz.model.AnswerSubmission;
+import com.manoj.quiz.model.Difficulty;
+import com.manoj.quiz.model.Question;
+import com.manoj.quiz.model.QuestionOption;
+import com.manoj.quiz.model.Quiz;
 import com.manoj.quiz.repository.QuestionRepo;
 import com.manoj.quiz.repository.QuizRepository;
+import com.manoj.quiz.service.QuizService;
 import com.manoj.quiz.service.ScoringService;
 import org.springframework.web.bind.annotation.*;
+
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -23,7 +31,12 @@ public class QuizController {
     private final QuizService quizService;
     private final ScoringService scoringService;
 
-    public QuizController(QuizRepository quizRepository, QuestionRepo questionRepo, QuizService quizService, ScoringService scoringService) {
+    public QuizController(
+            QuizRepository quizRepository,
+            QuestionRepo questionRepo,
+            QuizService quizService,
+            ScoringService scoringService
+    ) {
         this.quizRepository = quizRepository;
         this.questionRepo = questionRepo;
         this.quizService = quizService;
@@ -44,8 +57,19 @@ public class QuizController {
     public Question addQuestion(@PathVariable Long quizId, @RequestBody Question question) {
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new RuntimeException("Quiz not found"));
+
+        // attach quiz
         question.setQuiz(quiz);
+
+        // IMPORTANT: set the owning-side relationship so question_id is NOT null in QuestionOption
+        if (question.getOptions() != null) {
+            for (QuestionOption opt : question.getOptions()) {
+                opt.setQuestion(question);
+            }
+        }
+
         return questionRepo.save(question);
+
     }
 
     @GetMapping("/{quizId}/questions")
@@ -57,30 +81,26 @@ public class QuizController {
 
         return questions.stream().map(q -> {
 
-            // Convert List<QuestionOption> -> List<String>
-            List<String> opts = q.getOptions().stream()
-                    .map(opt -> {
-                        // If IMAGE question, return imageUrl; else return label
-                        if ("IMAGE".equalsIgnoreCase(q.getOptionType())) {
-                            return opt.getImageUrl();
-                        }
-                        return opt.getLabel();
-                    })
-                    .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
+            List<OptionDto> opts = new ArrayList<>();
+            if (q.getOptions() != null) {
+                for (QuestionOption opt : q.getOptions()) {
+                    opts.add(new OptionDto(opt.getLabel(), opt.getImageUrl()));
+                }
+            }
 
             Collections.shuffle(opts);
 
+            // DTO order: (id, text, optionType, options, servedAt, audioUrl)
             return new QuestionResponse(
                     q.getId(),
                     q.getText(),
+                    q.getOptionType(),
                     opts,
                     servedAt,
-                    q.getOptionType(),  // add this if your DTO includes it
-                    q.getAudioUrl()     // add this if your DTO includes it
+                    q.getAudioUrl()
             );
         }).toList();
     }
-
 
     @PostMapping("/{quizId}/submit")
     public QuizResult submitTimedQuiz(
@@ -101,7 +121,7 @@ public class QuizController {
         Question q = questionRepo.findById(questionId)
                 .orElseThrow(() -> new RuntimeException("Question not found"));
 
-        // (Optional) Safety check: ensure question belongs to quizId
+        // Safety check: ensure question belongs to quizId
         if (q.getQuiz() == null || !q.getQuiz().getId().equals(quizId)) {
             throw new RuntimeException("Question does not belong to this quiz");
         }
