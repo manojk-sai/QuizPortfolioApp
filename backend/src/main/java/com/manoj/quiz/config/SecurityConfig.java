@@ -2,16 +2,18 @@ package com.manoj.quiz.config;
 
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -25,23 +27,26 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http.csrf(csrf -> csrf.disable());
-        http.cors(cors -> {});
-        http.authorizeHttpRequests(auth -> auth
-                // public reads
-                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/quizzes/**").permitAll()
+        http
+                .csrf(csrf -> csrf.disable())
+                .cors(Customizer.withDefaults())
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                // protect scoring actions
-                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/quizzes/*/submit/**").authenticated()
-                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/quizzes/*/questions/*/check/**").authenticated()
+                        // public reads
+                        .requestMatchers(HttpMethod.GET, "/api/quizzes/**").permitAll()
 
-                // optionally protect create quiz / add questions
-                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/quizzes/**").authenticated()
+                        // protect scoring actions
+                        .requestMatchers(HttpMethod.POST, "/api/quizzes/*/submit/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/quizzes/*/questions/*/check/**").authenticated()
 
-                .anyRequest().authenticated()
-        );
+                        // optionally protect create quiz / add questions
+                        .requestMatchers(HttpMethod.POST, "/api/quizzes/**").authenticated()
 
-        http.oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.decoder(jwtDecoder())));
+                        .anyRequest().authenticated()
+                )
+                .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.decoder(jwtDecoder())));
+
         return http.build();
     }
 
@@ -51,19 +56,19 @@ public class SecurityConfig {
         return NimbusJwtDecoder.withSecretKey(key).build();
     }
 
-
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList(
+
+        configuration.setAllowedOriginPatterns(List.of(
                 "http://localhost:3000",
                 "https://quiz-portfolio-app.vercel.app",
-                "https://*.vercel.app",
-                "https://quiz-portfolio-*.vercel.app"  // Pattern for preview deployments
+                "https://*.vercel.app"
         ));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
-        configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
+
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        configuration.setExposedHeaders(List.of("Authorization", "Content-Type"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 
