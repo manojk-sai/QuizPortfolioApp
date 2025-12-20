@@ -35,10 +35,12 @@ public class SecurityConfig {
 
                         // public reads
                         .requestMatchers(HttpMethod.GET, "/api/quizzes/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/song-quiz/**").permitAll()
 
                         // protect scoring actions
                         .requestMatchers(HttpMethod.POST, "/api/quizzes/*/submit/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/quizzes/*/questions/*/check/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/song-quiz/**").authenticated()
 
                         // optionally protect create quiz / add questions
                         .requestMatchers(HttpMethod.POST, "/api/quizzes/**").authenticated()

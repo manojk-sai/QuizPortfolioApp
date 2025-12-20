@@ -94,6 +94,7 @@ export default function QuizPage({ quizId, difficulty }) {
   }, [timeLeft, score, questions.length, showFeedback]);
 
   const question = questions[currentIndex];
+  const options = (question?.options || []);
 
   const nextQuestion = useCallback(async () => {
   if (!question || score !== null || showFeedback) return;
@@ -262,23 +263,25 @@ export default function QuizPage({ quizId, difficulty }) {
                   mt: 2,
                 }}
               >
-                {question.options.map((opt) => {
-                  const isCorrect = showFeedback && opt === correctOption;
+                {options.map((opt) => {
+                  const optionLabel = typeof opt === "string" ? opt : opt.label;
+                  const optionImage = typeof opt === "string" ? null : opt.imageUrl;
+                  const isCorrect = showFeedback && optionLabel === correctOption;
                   const isWrongSelected =
-                    showFeedback && selectedOption === opt && opt !== correctOption;
+                    showFeedback && selectedOption === optionLabel && optionLabel !== correctOption;
 
                   return (
                     <Card
-                      key={opt}
+                      key={optionLabel}
                       variant="outlined"
-                      onClick={() => selectAnswer(opt)}
+                      onClick={() => selectAnswer(optionLabel)}
                       sx={{
                         cursor: showFeedback ? "default" : "pointer",
                         borderColor: isCorrect
                           ? "success.main"
                           : isWrongSelected
                           ? "error.main"
-                          : selectedOption === opt
+                          : selectedOption === optionLabel
                           ? "primary.main"
                           : "grey.300",
                         boxShadow:
@@ -287,7 +290,7 @@ export default function QuizPage({ quizId, difficulty }) {
                           ? "success.light"
                           : isWrongSelected
                           ? "error.light"
-                          : selectedOption === opt
+                          : selectedOption === optionLabel
                           ? "primary.light"
                           : "white",
                         opacity: showFeedback && !isCorrect && !isWrongSelected ? 0.8 : 1,
@@ -299,17 +302,31 @@ export default function QuizPage({ quizId, difficulty }) {
                       }}
                       role="radio"
                       tabIndex={0}
-                      aria-checked={selectedOption === opt}
+                      aria-checked={selectedOption === optionLabel}
                       onKeyDown={(e) => {
                         if (showFeedback) return;
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
-                          selectAnswer(opt);
+                          selectAnswer(optionLabel);
                         }
                       }}
                     >
                       <CardContent>
-                        <Typography>{opt}</Typography>
+                        {optionImage && (
+                          <Box
+                            component="img"
+                            src={optionImage}
+                            alt={optionLabel}
+                            sx={{
+                              width: "100%",
+                              maxHeight: 200,
+                              objectFit: "contain",
+                              borderRadius: 2,
+                              mb: 1,
+                            }}
+                          />
+                        )}
+                        <Typography>{optionLabel}</Typography>
                       </CardContent>
                     </Card>
                   );
@@ -339,6 +356,6 @@ export default function QuizPage({ quizId, difficulty }) {
 }
 
 QuizPage.propTypes = {
-  quizId: PropTypes.number.isRequired,
+  quizId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
   difficulty: PropTypes.string.isRequired,
 };
