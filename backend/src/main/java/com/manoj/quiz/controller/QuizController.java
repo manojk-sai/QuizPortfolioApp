@@ -68,6 +68,10 @@ public class QuizController {
             }
         }
 
+        if (question.getOptionType() == null || question.getOptionType().isEmpty()) {
+            question.setOptionType("TEXT");
+        }
+
         return questionRepo.save(question);
 
     }
