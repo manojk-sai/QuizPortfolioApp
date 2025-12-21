@@ -265,20 +265,20 @@ export default function QuizPage({ quizId, difficulty }) {
                 {question.options.map((opt) => {
                   const isCorrect = showFeedback && opt === correctOption;
                   const isWrongSelected =
-                    showFeedback && selectedOption === opt && opt !== correctOption;
+                    showFeedback && selectedOption === opt.label && opt.label !== correctOption;
 
                   return (
                     <Card
-                      key={opt}
+                      key={opt.label}
                       variant="outlined"
-                      onClick={() => selectAnswer(opt)}
+                      onClick={() => selectAnswer(opt.label)}
                       sx={{
                         cursor: showFeedback ? "default" : "pointer",
                         borderColor: isCorrect
                           ? "success.main"
                           : isWrongSelected
                           ? "error.main"
-                          : selectedOption === opt
+                          : selectedOption === opt.label
                           ? "primary.main"
                           : "grey.300",
                         boxShadow:
@@ -287,7 +287,7 @@ export default function QuizPage({ quizId, difficulty }) {
                           ? "success.light"
                           : isWrongSelected
                           ? "error.light"
-                          : selectedOption === opt
+                          : selectedOption === opt.label
                           ? "primary.light"
                           : "white",
                         opacity: showFeedback && !isCorrect && !isWrongSelected ? 0.8 : 1,
@@ -299,7 +299,7 @@ export default function QuizPage({ quizId, difficulty }) {
                       }}
                       role="radio"
                       tabIndex={0}
-                      aria-checked={selectedOption === opt}
+                      aria-checked={selectedOption === opt.label}
                       onKeyDown={(e) => {
                         if (showFeedback) return;
                         if (e.key === "Enter" || e.key === " ") {
@@ -309,7 +309,7 @@ export default function QuizPage({ quizId, difficulty }) {
                       }}
                     >
                       <CardContent>
-                        <Typography>{opt}</Typography>
+                        <Typography>{opt.label}</Typography>
                       </CardContent>
                     </Card>
                   );
