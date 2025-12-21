@@ -129,7 +129,14 @@ public class QuizController {
         if (q.getQuiz() == null || !q.getQuiz().getId().equals(quizId)) {
             throw new RuntimeException("Question does not belong to this quiz");
         }
-
+        var result = quizService.checkOneQuestion(
+                quizId,
+                questionId,
+                req.selectedOption(),
+                difficulty,
+                req.servedAt(),
+                req.answeredAt()
+        );
         Difficulty diff = Difficulty.valueOf(difficulty.toUpperCase());
 
         long taken = java.time.Duration.between(req.servedAt(), req.answeredAt()).getSeconds();
@@ -137,6 +144,6 @@ public class QuizController {
 
         int scoreEarned = scoringService.calculateForOne(correct, taken, diff.getSeconds());
 
-        return new AnswerCheckResponse(correct, q.getCorrectAnswer(), taken, scoreEarned);
+        return new AnswerCheckResponse(result.correct(), result.correctAnswerLabel(), taken, scoreEarned);
     }
 }
