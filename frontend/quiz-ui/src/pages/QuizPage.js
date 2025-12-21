@@ -1,18 +1,23 @@
 import PropTypes from "prop-types";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { getQuestions, submitTimedQuiz, checkAnswer } from "../services/QuizApi";
 import ScorePage from "./ScorePage";
 import Confetti from "react-confetti";
 import { Box, Typography, Card, CardContent, Button } from "@mui/material";
 
 const TIME_MAP = { easy: 20, medium: 15, hard: 10 };
+const FEEDBACK_MS = 900;
 
 export default function QuizPage({ quizId, difficulty }) {
   const [questions, setQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Used for final submit
+  // Final submit payload
   const [answers, setAnswers] = useState([]);
+  const answersRef = useRef([]);
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
 
   const [timeLeft, setTimeLeft] = useState(TIME_MAP[difficulty]);
   const [score, setScore] = useState(null);
@@ -22,147 +27,266 @@ export default function QuizPage({ quizId, difficulty }) {
   const [showFeedback, setShowFeedback] = useState(false);
   const [correctOption, setCorrectOption] = useState("");
 
+  // Confetti sizing
   const [windowSize, setWindowSize] = useState({
     width: window.innerWidth,
     height: window.innerHeight,
   });
 
-  // Prevent auto-advance firing multiple times for same question
+  // Prevent auto-advance firing multiple times for same question index
   const autoAdvancedIndexRef = useRef(-1);
 
-  // Track which questions have already had servedAt set
-  const servedQuestionsRef = useRef(new Set());
+  // Keep track of timers / async to avoid double-advance
+  const isAdvancingRef = useRef(false);
+  const feedbackTimeoutRef = useRef(null);
 
-  // Confetti sizing
+  // Audio element ref
+  const audioRef = useRef(null);
+
+  // Load questions
   useEffect(() => {
-    const handleResize = () => {
-      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    let alive = true;
+    getQuestions(quizId).then((data) => {
+      if (!alive) return;
+      setQuestions(Array.isArray(data) ? data : []);
+      setCurrentIndex(0);
+      setAnswers([]);
+      setSelectedOption("");
+      setShowFeedback(false);
+      setCorrectOption("");
+      setScore(null);
+    });
+    return () => {
+      alive = false;
     };
+  }, [quizId]);
+
+  // Resize listener (confetti)
+  useEffect(() => {
+    const handleResize = () =>
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Load questions
+  // Current question
+  const question = questions[currentIndex];
+
+  // Compute responsive layout: number of columns (max 4) and sizes
+  const optionCount = (question?.options || []).length;
+  const cols = Math.min(4, Math.max(1, optionCount));
+  // base width per card (e.g. 4 -> 25%)
+  const cardWidth = `${100 / cols}%`;
+  const imageHeight = cols === 1 ? "48vh" : cols === 2 ? "34vh" : "28vh";
+
+  // Ensure servedAt exists (use backend servedAt if present; else set when displayed)
   useEffect(() => {
-    getQuestions(quizId).then((data) => {
-      setQuestions(data);
+    if (!question || score !== null) return;
+    if (question.servedAt) return;
+
+    const now = new Date().toISOString();
+    setQuestions((prev) => {
+      const copy = [...prev];
+      copy[currentIndex] = { ...copy[currentIndex], servedAt: now };
+      return copy;
     });
-  }, [quizId]);
+  }, [question, currentIndex, score]);
+
+  // Reset timer on question change (only while quiz is running)
+  useEffect(() => {
+    if (score !== null || !questions.length) return;
+
+    setTimeLeft(TIME_MAP[difficulty]);
+    autoAdvancedIndexRef.current = -1;
+    isAdvancingRef.current = false;
+    setSelectedOption("");
+    setShowFeedback(false);
+    setCorrectOption("");
+
+    if (feedbackTimeoutRef.current) {
+      clearTimeout(feedbackTimeoutRef.current);
+      feedbackTimeoutRef.current = null;
+    }
+  }, [currentIndex, questions.length, difficulty, score]);
 
   const selectAnswer = (option) => {
     if (showFeedback) return;
     setSelectedOption(option);
   };
 
-  // Reset timer on question change (and only while quiz in progress)
+  // Timer countdown (pause during feedback)
   useEffect(() => {
-    if (score !== null || !questions.length) return;
-
-    setTimeLeft(TIME_MAP[difficulty]);
-    // Allow auto-advance again for the new question
-    autoAdvancedIndexRef.current = -1;
-  }, [currentIndex, questions.length, difficulty, score]);
-
-  // Set servedAt when question is first displayed
-  useEffect(() => {
-    if (!questions.length || score !== null) return;
-
-    const question = questions[currentIndex];
-    if (question && !servedQuestionsRef.current.has(currentIndex)) {
-      const now = new Date().toISOString();
-      servedQuestionsRef.current.add(currentIndex);
-      const updatedQuestions = [...questions];
-      updatedQuestions[currentIndex] = {
-        ...question,
-        servedAt: now,
-      };
-      setQuestions(updatedQuestions);
-    }
-  }, [currentIndex, questions, score]);
-
-  // Countdown (pause while feedback is showing)
-  useEffect(() => {
-    if (score !== null || !questions.length || timeLeft === null || showFeedback) return;
-
+    if (score !== null || !questions.length || showFeedback) return;
     if (timeLeft === 0) return;
 
     const timer = setInterval(() => {
-      setTimeLeft((prev) => prev - 1);
+      setTimeLeft((prev) => Math.max(0, prev - 1));
     }, 1000);
 
     return () => clearInterval(timer);
   }, [timeLeft, score, questions.length, showFeedback]);
 
-  const question = questions[currentIndex];
+  // --- AUDIO: play if question has audioUrl, stop otherwise ---
+  const audioSrc = useMemo(() => {
+    const url = question?.audioUrl;
+    if (!url) return null;
 
-  const nextQuestion = useCallback(async () => {
-  if (!question || score !== null || showFeedback) return;
+    // If backend sends "/audio/..." and files are in React public/,
+    // this works as a relative URL (frontend origin).
+    // If backend sends full URL, it also works.
+    return url;
+  }, [question?.audioUrl]);
 
-  const answeredAt = new Date().toISOString();
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
 
-  const payload = {
-    selectedOption: selectedOption || "", // empty means skipped
-    servedAt: question.servedAt,
-    answeredAt,
-  };
+    // Always stop current audio first
+    el.pause();
+    el.currentTime = 0;
 
-  // Call backend to validate correctness + return correct answer
-  const resp = await checkAnswer(quizId, question.id, payload, difficulty);
+    // No audio for this question
+    if (!audioSrc || score !== null) return;
 
-  setCorrectOption(resp.correctAnswer);
-  setShowFeedback(true);
+    // Set new src and try to autoplay (may be blocked until user interaction)
+    el.src = audioSrc;
+    el.load();
 
-  const newAnswer = {
-    questionId: question.id,
-    selectedOption: selectedOption || "",
-    servedAt: question.servedAt,
-    answeredAt,
-  };
-
-  setAnswers((prev) => [...prev, newAnswer]);
-
-  // Show highlight for 1 second, then move on
-  setTimeout(async () => {
-    setShowFeedback(false);
-    setSelectedOption("");
-
-    if (currentIndex < questions.length - 1) {
-      setCurrentIndex((prev) => prev + 1);
-      // Extra safety: reset immediately so we never sit on 0
-      setTimeLeft(TIME_MAP[difficulty]);
-    } else {
-      // Submit the whole attempt for total score
-      const result = await submitTimedQuiz(quizId, [...answers, newAnswer], difficulty);
-      setScore(result.totalScore ?? result);
+    const p = el.play();
+    if (p && typeof p.catch === "function") {
+      p.catch(() => {
+        // Autoplay might be blocked by browser. User can click Play.
+      });
     }
-  }, 1000);
-  }, [
-    quizId,
-    difficulty,
-    question,
-    currentIndex,
-    questions.length,
-    selectedOption,
-    answers,
-    score,
-    showFeedback,
-  ]);
+  }, [audioSrc, score, currentIndex]);
 
-  // ✅ If time hits 0, auto-advance ONLY ONCE per question index
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+      const el = audioRef.current;
+      if (el) {
+        el.pause();
+        el.src = "";
+      }
+    };
+  }, []);
+
+  const nextQuestion = useCallback(
+    async (reason = "manual") => {
+      if (!question || score !== null) return;
+      if (showFeedback) return;
+      if (isAdvancingRef.current) return;
+      isAdvancingRef.current = true;
+
+      const answeredAt = new Date().toISOString();
+      const servedAt = question.servedAt || answeredAt;
+
+      const chosen = selectedOption || ""; // empty = skipped
+      const payload = {
+        selectedOption: chosen,
+        servedAt,
+        answeredAt,
+      };
+      console.log("Answer payload:", payload);
+      try {
+        // Ask backend for correct answer feedback
+        const resp = await checkAnswer(quizId, question.id, payload, difficulty);
+
+        // Show highlight
+        setCorrectOption(resp?.correctAnswer || "");
+        setShowFeedback(true);
+
+        const newAnswer = {
+          questionId: question.id,
+          selectedOption: chosen,
+          servedAt,
+          answeredAt,
+        };
+
+        // Save answer locally (use functional update AND ref for final submit)
+        setAnswers((prev) => {
+          const next = [...prev, newAnswer];
+          answersRef.current = next;
+          return next;
+        });
+
+        feedbackTimeoutRef.current = setTimeout(async () => {
+          setShowFeedback(false);
+          setSelectedOption("");
+
+          if (currentIndex < questions.length - 1) {
+            setCurrentIndex((prev) => prev + 1);
+            setTimeLeft(TIME_MAP[difficulty]); // ensure timer reset immediately
+            isAdvancingRef.current = false;
+          } else {
+            // Submit whole quiz with latest answersRef (includes skipped ones)
+            const finalAnswers = answersRef.current;
+            const result = await submitTimedQuiz(
+              quizId,
+              finalAnswers,
+              difficulty
+            );
+            setScore(result?.totalScore ?? result);
+            isAdvancingRef.current = false;
+          }
+        }, FEEDBACK_MS);
+      } catch (e) {
+        // If checkAnswer fails (network/backend), still move forward safely
+        const newAnswer = {
+          questionId: question.id,
+          selectedOption: selectedOption || "",
+          servedAt,
+          answeredAt,
+        };
+        setAnswers((prev) => {
+          const next = [...prev, newAnswer];
+          answersRef.current = next;
+          return next;
+        });
+
+        if (currentIndex < questions.length - 1) {
+          setCurrentIndex((prev) => prev + 1);
+          setTimeLeft(TIME_MAP[difficulty]);
+          isAdvancingRef.current = false;
+        } else {
+          const result = await submitTimedQuiz(
+            quizId,
+            answersRef.current,
+            difficulty
+          );
+          setScore(result?.totalScore ?? result);
+          isAdvancingRef.current = false;
+        }
+      }
+    },
+    [
+      question,
+      score,
+      showFeedback,
+      selectedOption,
+      quizId,
+      difficulty,
+      currentIndex,
+      questions.length,
+    ]
+  );
+
+  // Auto-advance exactly once when time hits 0
   useEffect(() => {
     if (score !== null || !questions.length || showFeedback) return;
 
     if (timeLeft === 0 && autoAdvancedIndexRef.current !== currentIndex) {
       autoAdvancedIndexRef.current = currentIndex;
-      nextQuestion();
+      nextQuestion("timeout");
     }
   }, [timeLeft, score, questions.length, showFeedback, currentIndex, nextQuestion]);
 
   if (!questions.length) return <Typography>Loading...</Typography>;
   if (!question) return <Typography>Loading question...</Typography>;
 
-  // Full-page timer bar calculation
-  const totalTime = TIME_MAP[difficulty];
+  // Full-page timer bar
+  const totalTime = TIME_MAP[difficulty] || 20;
   const progressRatio = Math.max(0, Math.min(1, timeLeft / totalTime));
   const progressPercent = progressRatio * 100;
 
@@ -192,12 +316,15 @@ export default function QuizPage({ quizId, difficulty }) {
             height: "100vh",
             width: `${progressPercent}%`,
             backgroundColor,
-            opacity: 0.2,
+            opacity: 0.18,
             zIndex: 0,
             transition: "width 1s linear, background-color 1s linear",
           }}
         />
       )}
+
+      {/* Hidden audio element (plays if audioUrl exists) */}
+      <audio ref={audioRef} preload="auto" loop />
 
       {/* MAIN CONTENT LAYER */}
       <Box
@@ -205,23 +332,24 @@ export default function QuizPage({ quizId, difficulty }) {
           position: "relative",
           zIndex: 1,
           minHeight: "100vh",
+          pb: "72px",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           p: 2,
         }}
       >
-        {/* CENTERED QUIZ CARD */}
         <Box
           sx={{
             width: "100%",
-            maxWidth: 600,
+            maxWidth: "100%",
             bgcolor: "background.paper",
-            borderRadius: 3,
-            boxShadow: 10,
-            p: { xs: 2, sm: 3 },
+            borderRadius: 0,
+            boxShadow: 0,
+            p: { xs: 1, sm: 2 },
             display: "flex",
             flexDirection: "column",
+            minHeight: "100vh",
           }}
         >
           <Typography variant="h5" gutterBottom textAlign="center">
@@ -237,6 +365,17 @@ export default function QuizPage({ quizId, difficulty }) {
                 <Typography variant="body1" sx={{ mt: 1 }}>
                   Time Left: {timeLeft}s
                 </Typography>
+
+                {/* Optional: show small hint if audio exists */}
+                {audioSrc ? (
+                  <Typography variant="caption" color="text.secondary">
+                    🔊 Audio playing
+                  </Typography>
+                ) : (
+                  <Typography variant="caption" color="text.secondary">
+                    (No audio for this question)
+                  </Typography>
+                )}
               </CardContent>
             </Card>
           )}
@@ -251,65 +390,102 @@ export default function QuizPage({ quizId, difficulty }) {
                 {question.text}
               </Typography>
 
-              {/* Options */}
+              {/* OPTIONS */}
               <Box
                 role="radiogroup"
                 aria-label="Answer choices"
                 sx={{
                   display: "flex",
-                  flexDirection: "column",
-                  gap: 1.5,
+                  flexDirection: "row",
+                  // Force a single row: no wrapping, let items shrink to fit
+                  flexWrap: "nowrap",
+                  gap: 2,
                   mt: 2,
+                  overflowX: "hidden",
+                  p: 0,
+                  alignItems: "stretch",
+                  justifyContent: "space-between",
                 }}
               >
-                {question.options.map((opt) => {
-                  const isCorrect = showFeedback && opt === correctOption;
+                {(question.options || []).map((opt) => {
+                  const label = typeof opt === "string" ? opt : opt?.label;
+                  const imageUrl = typeof opt === "string" ? null : opt?.imageUrl;
+                  if (!label) return null;
+
+                  const isImage =
+                    String(question.optionType).toUpperCase() === "IMAGE";
+
+                  const isCorrect = showFeedback && label === correctOption;
                   const isWrongSelected =
-                    showFeedback && selectedOption === opt.label && opt.label !== correctOption;
+                    showFeedback &&
+                    selectedOption === label &&
+                    label !== correctOption;
+                  const isSelected = selectedOption === label;
 
                   return (
                     <Card
-                      key={opt.label}
+                      key={label}
                       variant="outlined"
-                      onClick={() => selectAnswer(opt.label)}
+                      onClick={() => {
+                        if (showFeedback) return;
+                        selectAnswer(label);
+                      }}
                       sx={{
                         cursor: showFeedback ? "default" : "pointer",
+                        // allow cards to shrink so all fit in one row; keep equal base width
+                        flex: `1 1 ${cardWidth}`,
+                        minWidth: 0,
                         borderColor: isCorrect
                           ? "success.main"
                           : isWrongSelected
                           ? "error.main"
-                          : selectedOption === opt.label
+                          : isSelected
                           ? "primary.main"
                           : "grey.300",
                         boxShadow:
-                          isCorrect || isWrongSelected ? 6 : selectedOption === opt ? 4 : 1,
+                          isCorrect || isWrongSelected ? 6 : isSelected ? 4 : 1,
                         bgcolor: isCorrect
                           ? "success.light"
                           : isWrongSelected
                           ? "error.light"
-                          : selectedOption === opt.label
+                          : isSelected
                           ? "primary.light"
                           : "white",
-                        opacity: showFeedback && !isCorrect && !isWrongSelected ? 0.8 : 1,
+                        opacity:
+                          showFeedback && !isCorrect && !isWrongSelected
+                            ? 0.85
+                            : 1,
                         transition: "all 0.2s",
-                        "&:focus-visible": {
-                          outline: "2px solid",
-                          outlineColor: "primary.main",
-                        },
-                      }}
-                      role="radio"
-                      tabIndex={0}
-                      aria-checked={selectedOption === opt.label}
-                      onKeyDown={(e) => {
-                        if (showFeedback) return;
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          selectAnswer(opt);
-                        }
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "flex-start",
                       }}
                     >
-                      <CardContent>
-                        <Typography>{opt.label}</Typography>
+                      <CardContent sx={{ textAlign: "center" }}>
+                        {isImage && imageUrl ? (
+                          <>
+                            <img
+                              src={imageUrl}
+                              alt={label}
+                              style={{
+                                // let image scale down so all cards fit in a single row
+                                width: "auto",
+                                maxWidth: "70%",
+                                height: imageHeight,
+                                objectFit: "cover",
+                                borderRadius: 8,
+                              }}
+                            />
+                            <Typography sx={{ mt: 1, fontWeight: 600 }}>
+                              {label}
+                            </Typography>
+                          </>
+                        ) : (
+                          <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                            {label}
+                          </Typography>
+                        )}
                       </CardContent>
                     </Card>
                   );
@@ -317,13 +493,34 @@ export default function QuizPage({ quizId, difficulty }) {
               </Box>
 
               <Button
-                fullWidth
                 variant="contained"
-                sx={{ mt: 3 }}
-                onClick={nextQuestion}
-                disabled={!selectedOption || showFeedback}
+                onClick={() => nextQuestion("manual")}
+                disabled={showFeedback}
+                sx={{
+                  position: 'fixed',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  bottom: 16,
+                  width: { xs: '92%', sm: '70%', md: '56%' },
+                  maxWidth: 760,
+                  height: 64,
+                  borderRadius: 32,
+                  fontSize: '1.05rem',
+                  fontWeight: 700,
+                  letterSpacing: 0.6,
+                  boxShadow: 8,
+                  bgcolor: 'primary.main',
+                  color: 'common.white',
+                  px: 3,
+                  '&:hover': {
+                    transform: 'translateX(-50%) scale(1.02)',
+                    boxShadow: 12,
+                    bgcolor: 'primary.dark',
+                  },
+                  transition: 'transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease',
+                }}
               >
-                Next
+                Next →
               </Button>
             </>
           ) : (
