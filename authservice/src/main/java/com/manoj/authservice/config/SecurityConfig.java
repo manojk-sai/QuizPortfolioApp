@@ -24,6 +24,10 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers(request -> {
+                            String origin = request.getHeader("Origin");
+                            return "http://localhost:3000".equals(origin) || "http://127.0.0.1:3000".equals(origin);
+                        }).permitAll()
                         // auth endpoints are public
                         .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().denyAll()
