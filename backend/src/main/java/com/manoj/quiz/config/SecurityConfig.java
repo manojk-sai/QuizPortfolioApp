@@ -36,6 +36,9 @@ public class SecurityConfig {
                         // public reads
                         .requestMatchers(HttpMethod.GET, "/api/quizzes/**").permitAll()
 
+                        // swagger and api docs
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+
                         // protect scoring actions
                         .requestMatchers(HttpMethod.POST, "/api/quizzes/*/submit/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/quizzes/*/questions/*/check/**").authenticated()
