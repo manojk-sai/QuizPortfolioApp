@@ -123,6 +123,10 @@ public class QuizController {
         List<Question> questions = questionRepo.findByQuizId(quizId);
 
         Collections.shuffle(questions);
+
+        if (questions.size() > 5) {
+            questions = questions.subList(0, 5);
+        }
         Instant servedAt = Instant.now();
 
         return questions.stream().map(q -> {
