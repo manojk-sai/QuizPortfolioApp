@@ -1,11 +1,13 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import QuizList from "../components/QuizList";
 import QuizPage from "./QuizPage";
-import { Container, Typography, Select, MenuItem, FormControl, InputLabel, Paper } from "@mui/material";
+import { Button, Container, Typography, Select, MenuItem, FormControl, InputLabel, Paper, Box } from "@mui/material";
 
 export default function HomePage() {
   const [selectedQuizId, setSelectedQuizId] = useState(null);
   const [difficulty, setDifficulty] = useState("easy");
+  const navigate = useNavigate();
 
   if(selectedQuizId){
     return <QuizPage quizId={selectedQuizId} difficulty={difficulty} />
@@ -14,9 +16,14 @@ export default function HomePage() {
   return (
     <Container maxWidth="md" sx={{ mt: 4 }}>
       <Paper elevation={3} sx={{ p: 4 }}>
-        <Typography variant="h3" align="center" gutterBottom>
-          Quiz Application
-        </Typography>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="h3" gutterBottom>
+            Quiz Application
+          </Typography>
+          <Button variant="outlined" onClick={() => navigate("/admin")}>
+            Admin
+          </Button>
+        </Box>
 
         <FormControl fullWidth sx={{ mb: 4 }}>
           <InputLabel>Difficulty</InputLabel>
