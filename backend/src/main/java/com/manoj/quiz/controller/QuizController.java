@@ -124,9 +124,9 @@ public class QuizController {
 
         Collections.shuffle(questions);
 
-        if (questions.size() > 5) {
+        /*if (questions.size() > 5) {
             questions = questions.subList(0, 5);
-        }
+        }*/
         Instant servedAt = Instant.now();
 
         return questions.stream().map(q -> {
