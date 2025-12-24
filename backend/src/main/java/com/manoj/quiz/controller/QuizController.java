@@ -26,9 +26,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/quizzes")
@@ -124,12 +122,26 @@ public class QuizController {
 
         Collections.shuffle(questions);
 
-        /*if (questions.size() > 5) {
-            questions = questions.subList(0, 5);
-        }*/
+        List<Question> originalQuestions = new ArrayList<>();
+        Set<String> seenAudioUrls = new HashSet<>();
+
+        for(Question question : questions) {
+            String audioUrl = question.getAudioUrl();
+            if (audioUrl == null || audioUrl.isEmpty() || !seenAudioUrls.contains(audioUrl)) {
+                uniqueAudioQuestions.add(question);
+                if (audioUrl != null && !audioUrl.isEmpty()) {
+                    seenAudioUrls.add(audioUrl);
+                }
+            }
+        }
+
+        if(uniqueAudioQuestions.size() >=5 ) {
+            uniqueAudioQuestions = uniqueAudioQuestions.subList(0, 5);
+        }
+
         Instant servedAt = Instant.now();
 
-        return questions.stream().map(q -> {
+        return uniqueAudioQuestions.stream().map(q -> {
 
             List<OptionDto> opts = new ArrayList<>();
             if (q.getOptions() != null) {
