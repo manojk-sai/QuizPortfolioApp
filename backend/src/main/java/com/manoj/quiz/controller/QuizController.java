@@ -122,7 +122,7 @@ public class QuizController {
 
         Collections.shuffle(questions);
 
-        List<Question> originalQuestions = new ArrayList<>();
+        List<Question> uniqueAudioQuestions = new ArrayList<>();
         Set<String> seenAudioUrls = new HashSet<>();
 
         for(Question question : questions) {
