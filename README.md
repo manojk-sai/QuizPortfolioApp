@@ -3,16 +3,17 @@
 A full-stack quiz platform built to showcase production-ready practices across frontend, API design, and secure authentication. The system ships as three deployable parts (React UI + quiz service + auth service), and is structured to be easy to run locally or deploy as separate services.
 
 ## Why this project stands out
-- **Modern full-stack architecture**: React 19 + Spring Boot 3.x microservices with JWT-based auth.
+- **Modern full stack architecture**: React 19 + Spring Boot 3.x microservices with JWT-based auth.
 - **Scalable domain design**: clear separation between authentication and quiz/scoring logic.
-- **API-first implementation**: REST endpoints and OpenAPI annotations for easy integration.
-- **Security-minded defaults**: BCrypt password hashing, JWT tokens, and role-based access in the API.
+- **API first implementation**: REST endpoints and OpenAPI annotations for easy integration.
+- **Security minded defaults**: BCrypt password hashing, JWT tokens, and role-based access in the API.
 
 ## Features
 - User registration & login with JWT issuance.
 - Create quizzes, add questions/options, and randomize quiz delivery.
-- Difficulty-aware scoring and per-question answer checks.
+- Difficulty aware scoring and per question answer checks.
 - Audio-enabled questions and randomized options.
+- Role based admin UI for managing quizzes.
 - OpenAPI/Swagger documentation for the quiz API.
 
 ## Architecture overview
@@ -102,9 +103,8 @@ QuizPortfolioApp/
 
 ## Roadmap ideas
 - Containerize services with Docker Compose for one-command startup.
-- Add role-based admin UI for managing quizzes.
 - Add test coverage reports and CI workflow.
 
 ---
 
-If you’re evaluating this project for a role, the codebase is intentionally organized to highlight production-ready practices: clear service boundaries, secure authentication, and a frontend that consumes well-structured APIs.
+If you’re evaluating this project for a role, the codebase is intentionally organized to highlight production ready practices: clear service boundaries, secure authentication, and a frontend that consumes well structured APIs.
