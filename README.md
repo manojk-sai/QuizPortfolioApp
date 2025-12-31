@@ -3,10 +3,10 @@
 A full-stack quiz platform built to showcase production-ready practices across frontend, API design, and secure authentication. The system ships as three deployable parts (React UI + quiz service + auth service), and is structured to be easy to run locally or deploy as separate services.
 
 ## Why this project stands out
-- **Modern full stack architecture**: React 19 + Spring Boot 3.x microservices with JWT-based auth.
-- **Scalable domain design**: clear separation between authentication and quiz/scoring logic.
-- **API first implementation**: REST endpoints and OpenAPI annotations for easy integration.
-- **Security minded defaults**: BCrypt password hashing, JWT tokens, and role-based access in the API.
+- **Production-style architecture**: React 19 frontend with Spring Boot 3.x microservices and stateless JWT authentication.
+- **Clear service boundaries**: authentication isolated from quiz and scoring logic to reflect real microservice deployments.
+- **API-first design**: well defined REST contracts with OpenAPI documentation for frontend and third-party consumers.
+- **Security-first defaults**: BCrypt password hashing, signed JWTs, and role-based access enforced at the API layer.
 
 ## Features
 - User registration & login with JWT issuance.
@@ -22,6 +22,11 @@ frontend/quiz-ui   → React UI (Material UI)
 authservice/       → Spring Boot auth API (JWT + BCrypt)
 backend/           → Spring Boot quiz API (quizzes, questions, scoring)
 ```
+## Key engineering decisions
+- **Separate auth service**: keeps authentication concerns isolated and reusable across future services.
+- **JWT-based stateless auth**: enables horizontal scaling without shared session state.
+- **Server-side scoring & validation**: prevents client side tampering of quiz results.
+- **Randomized question delivery**: reduces answer pattern memorization and replay bias.
 
 ## Tech stack
 **Frontend**
@@ -102,9 +107,10 @@ QuizPortfolioApp/
 ```
 
 ## Roadmap ideas
-- Containerize services with Docker Compose for one-command startup.
 - Add test coverage reports and CI workflow.
+- Quiz analytics (attempt trends, difficulty insights).
 
----
+## Demo
+Live demo: https://quiz-portfolio-app.vercel.app/
 
-If you’re evaluating this project for a role, the codebase is intentionally organized to highlight production ready practices: clear service boundaries, secure authentication, and a frontend that consumes well structured APIs.
+> Note: Backend services may be in sleep mode on first load depending on hosting.
